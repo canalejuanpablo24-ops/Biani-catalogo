@@ -924,6 +924,37 @@ openAdmin = function() {
   setTimeout(loadGhConfig, 100);
 };
 
+
+// ════════════════════════════════════════════
+//  LAZY IMAGE LOADING BY CATEGORY
+// ════════════════════════════════════════════
+const loadedCats = new Set();
+
+function loadCategoryImages(cat) {
+  const catsToLoad = cat === 'all' 
+    ? ALL_CATEGORIES.map(c => c.name) 
+    : [cat];
+  
+  catsToLoad.forEach(c => {
+    if(loadedCats.has(c)) return;
+    loadedCats.add(c);
+    const safe = c.replace(/ /g,'-').replace(/\//g,'_');
+    fetch('img-' + safe + '.json')
+      .then(r => r.ok ? r.json() : {})
+      .then(imgs => {
+        let changed = false;
+        ALL_PRODUCTS.forEach(p => {
+          if(p.categoria === c && p.has_img && !p.imagen && imgs[p.nombre]) {
+            p.imagen = imgs[p.nombre];
+            changed = true;
+          }
+        });
+        if(changed) renderPage();
+      })
+      .catch(() => {});
+  });
+}
+
 </script>
 <script>
 // ════════════════════════════════════════════
@@ -958,10 +989,10 @@ const WA_NUMBER = '5492954000000'; // ← CAMBIAR por número real
 //  INIT
 // ════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
+  // Load index (no images) - fast initial load
   fetch('products.json')
     .then(r => r.json())
     .then(data => {
-      // Separate products and categories from JSON
       ALL_PRODUCTS.push(...data.products);
       ALL_CATEGORIES.push(...data.categories);
       stampIdx();
@@ -973,6 +1004,8 @@ document.addEventListener('DOMContentLoaded', () => {
       renderCart();
       updateCartBadge();
       document.getElementById('loading').style.display = 'none';
+      // Preload current category images
+      loadCategoryImages(currentCat);
     })
     .catch(err => {
       document.getElementById('loading').innerHTML = '<div style="text-align:center;padding:40px"><p style="color:#e63946;font-size:1.1rem">❌ Error cargando catálogo</p><p style="color:#aaa;margin-top:8px">'+err.message+'</p></div>';
@@ -1020,6 +1053,7 @@ function selectCat(cat) {
   document.getElementById('search').value = '';
   buildCatList();
   applyFilters();
+  loadCategoryImages(cat);
   // close sidebar on mobile
   if(window.innerWidth < 901) {
     document.getElementById('sidebar').classList.remove('open');
